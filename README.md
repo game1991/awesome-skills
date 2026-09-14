@@ -23,6 +23,7 @@ Skills are standard `SKILL.md` folders — you can also copy any `skills/<name>/
 | [director-mode](skills/director-mode/) | Director / lead-engineer collaboration mode: the human acts as chief architect, the agent as senior programmer — with a decision ledger, impact map, dual-channel reporting, gate nodes, and adversarial self-verification. |
 | [learning-from-experience](skills/learning-from-experience/) | Routes "save this pattern" moments to the right artifact — SKILL.md upgrade, script/MCP proposal, or memory rule — without duplicating auto-memory. |
 | [web-search-cn](skills/web-search-cn/) | Searches the Chinese web via a Baidu → Sogou fallback chain when built-in web search returns US-only results. |
+| [interactive-html-diagrams](skills/interactive-html-diagrams/) | Makes every Mermaid diagram in an HTML document interactive — wheel zoom anchored at cursor, drag pan, double-click reset to fit, fullscreen overlay. Zero external libs: one Mermaid CDN + pure JS SVG `transform`. |
 | [fix-plugin-scope](skills/fix-plugin-scope/) | Diagnoses and fixes "not cached at (not recorded)" plugin errors caused by wrong scope markers in `installed_plugins.json`. |
 
 ## Why touchstone?
@@ -52,13 +53,14 @@ MIT — see [LICENSE](LICENSE).
 /plugin install touchstone@awesome-skills
 ```
 
-**收录 6 个 skill**,亮点:
+**收录 7 个 skill**,亮点:
 
 - **touchstone(旗舰)**:项目结论五态生命周期(`BETA → RC → GA → SUPERSEDED → EOL`)。结论只有经用户明示归档才能当事实引用;被推翻的结论不删除,而是双向链接标记 SUPERSEDED——消灭"AI 自信地引用过时结论"这一失败模式。
 - **ui-workflow**:分层访谈 → 高保真 HTML 原型 → 确认迭代 → 落码,组件库可插拔(默认通用 HTML,可适配 Ant Design / Element Plus)。
 - **director-mode**:指挥官-主程协作模式——决策台账、影响面地图、双通道汇报、门禁节点、对抗性自证。
 - **learning-from-experience**:把"记一下这个模式"路由到正确的载体——SKILL.md 升级、脚本/MCP 提案或记忆规则,不与自动记忆重复。
 - **web-search-cn**:内置搜索对中国内容覆盖差时,走百度→搜狗降级链搜中文互联网。
+- **interactive-html-diagrams**:HTML 文档里每个 Mermaid 图支持滚轮缩放(以鼠标为锚点)、拖拽平移、双击重置、全屏——零外部库,单 Mermaid CDN + 纯 JS SVG `transform`,附踩坑集。
 - **fix-plugin-scope**:修复 `installed_plugins.json` scope 标记错误导致的插件 "not cached" 报错。
 
 全部原创,MIT 协议。推荐搭配 [mattpocock/skills](https://github.com/mattpocock/skills)、[anthropics/skills](https://github.com/anthropics/skills) 使用。

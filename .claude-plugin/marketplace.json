@@ -28,6 +28,16 @@
       "name": "web-search-cn",
       "source": "./skills/web-search-cn",
       "description": "Search the Chinese web (Baidu/Sogou fallback chain) when built-in WebSearch returns US-only results"
+    },
+    {
+      "name": "interactive-html-diagrams",
+      "source": "./skills/interactive-html-diagrams",
+      "description": "Make every Mermaid diagram in an HTML doc interactive: wheel zoom, drag pan, double-click reset, fullscreen — zero external libs, pure JS + SVG transform"
+    },
+    {
+      "name": "fix-plugin-scope",
+      "source": "./skills/fix-plugin-scope",
+      "description": "Fix 'not cached at (not recorded)' plugin errors caused by wrong scope markers in installed_plugins.json (kscc/Claude Code forks)"
     }
   ]
 }

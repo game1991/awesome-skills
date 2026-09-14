@@ -1,0 +1,326 @@
+<!--
+  interactive-html-diagrams · 完整可拷贝模板
+  将下面三部分拷贝到你的 HTML 文档即可让所有 Mermaid 图支持缩放/拖拽/全屏。
+
+  用法：Mermaid 图照常用 <div class="mermaid">graph TB ... </div>，JS 自动扫描初始化。
+  依赖：仅 mermaid 一个 CDN（无 svg-pan-zoom 等外部库）。
+-->
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>你的文档标题</title>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 第 1 部分：Mermaid CDN + 图交互 CSS（放入 <head>）            -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  /* === 主题变量（改成你的配色）=== */
+  :root{
+    --bg:#0a0e17; --card:#131c2e; --border:#1e2d47;
+    --accent:#06b6d4; --text:#e2e8f0; --muted:#7c8db5;
+    --bg2:#0f1623; --fail:#f87171;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,-apple-system,"PingFang SC",sans-serif;color:var(--text);background:var(--bg);line-height:1.7;font-size:15px}
+
+  /* === 图表交互：自实现 pan/zoom，无外部库依赖 === */
+  .mermaid{
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    margin:16px 0; text-align:center;
+    position:relative; overflow:hidden; cursor:grab;
+    padding:20px 56px 20px 20px; min-height:320px; max-height:78vh;
+  }
+  .mermaid:active{cursor:grabbing}
+  .mermaid svg{max-width:none;max-height:none;display:inline-block}
+  .zoom-bar{
+    position:absolute; top:10px; right:10px; z-index:20;
+    display:flex; flex-direction:column; gap:4px;
+    background:rgba(15,22,35,.92); border:1px solid var(--border);
+    border-radius:6px; padding:4px;
+  }
+  .zoom-bar button{
+    width:30px; height:30px; border:none; background:var(--bg2);
+    border-radius:4px; cursor:pointer; font-size:15px; color:var(--muted);
+    display:flex; align-items:center; justify-content:center;
+    line-height:1; padding:0; transition:.15s;
+  }
+  .zoom-bar button:hover{background:var(--accent);color:#0a0e17}
+  .zoom-hint{
+    position:absolute; bottom:8px; left:12px; z-index:20;
+    font-size:11px; color:var(--muted);
+    background:rgba(15,22,35,.8); padding:2px 8px;
+    border-radius:10px; pointer-events:none;
+  }
+  /* === 全屏 modal === */
+  .fullscreen-overlay{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(5,8,15,.95);z-index:9999;backdrop-filter:blur(4px)}
+  .fullscreen-overlay.active{display:flex;flex-direction:column}
+  .fullscreen-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+  .fullscreen-header .title{color:var(--accent);font-size:15px;font-weight:600}
+  .fullscreen-header .close{background:none;border:1px solid var(--border);color:var(--text);padding:6px 16px;border-radius:6px;cursor:pointer;font-size:13px}
+  .fullscreen-header .close:hover{background:var(--fail);border-color:var(--fail);color:#fff}
+  .fullscreen-body{flex:1;overflow:hidden;position:relative;padding:20px;cursor:grab}
+  .fullscreen-body:active{cursor:grabbing}
+</style>
+</head>
+<body>
+
+<!-- 你的文档内容，Mermaid 图照常用 <div class="mermaid"> -->
+<div style="max-width:1100px;margin:0 auto;padding:36px 28px">
+
+  <h2>架构图</h2>
+  <div class="mermaid">
+  graph TB
+    A[调用方] --> B[服务A]
+    B --> C[数据库]
+    style A fill:#1e3a5f,stroke:#06b6d4
+    style B fill:#1e3a5f,stroke:#06b6d4
+    style C fill:#0d4f4f,stroke:#34d399
+  </div>
+
+  <h2>时序图</h2>
+  <div class="mermaid">
+  sequenceDiagram
+    participant A as 客户端
+    participant B as 服务端
+    A->>B: 请求
+    B-->>A: 响应
+  </div>
+
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 第 2 部分：全屏 overlay HTML（放 <body> 末尾）                 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="fullscreen-overlay" id="fullscreen-overlay">
+  <div class="fullscreen-header">
+    <div class="title" id="fullscreen-title">图表</div>
+    <button class="close" onclick="closeFullscreen()">✕ 关闭 (ESC)</button>
+  </div>
+  <div class="fullscreen-body" id="fullscreen-body"></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- 第 3 部分：Mermaid 渲染 + 自实现 pan/zoom + 全屏 JS           -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<script>
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#1e3a5f', primaryTextColor: '#e2e8f0', primaryBorderColor: '#06b6d4',
+      lineColor: '#7c8db5', secondaryColor: '#131c2e', tertiaryColor: '#0f1623',
+      fontFamily: 'Inter, sans-serif'
+    }
+  });
+
+  function makeBtn(cls, title, label) {
+    var b = document.createElement('button');
+    b.className = cls; b.title = title; b.textContent = label;
+    return b;
+  }
+
+  function setupPanZoom(container, idx) {
+    if (container.dataset.pzReady) return;
+    var svg = container.querySelector('svg');
+    if (!svg) return;
+    var vb = svg.getAttribute('viewBox');
+    if (!vb) return;
+    container.dataset.pzReady = '1';
+
+    // SVG 用 viewBox 像素尺寸，避免 Mermaid 的 width=100% 干扰
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
+    svg.style.maxWidth = 'none';
+    svg.style.maxHeight = 'none';
+    svg.style.display = 'inline-block';
+    var parts = vb.split(/\s+/);
+    var vbW = parseFloat(parts[2]);
+    var vbH = parseFloat(parts[3]);
+    svg.style.width = vbW + 'px';
+    svg.style.height = vbH + 'px';
+    svg.style.transformOrigin = '0 0';
+
+    var state = { scale: 1, x: 0, y: 0 };
+    var MIN = 0.2, MAX = 6;
+
+    // 初始自适应 fit：图比容器宽时缩小居中，确保初始能看到全图
+    var fitScale = Math.min(container.clientWidth / vbW, container.clientHeight / vbH);
+    if (fitScale < 1) {
+      state.scale = fitScale;
+      state.x = (container.clientWidth - vbW * fitScale) / 2;
+      state.y = 10;
+    }
+    // 保存初始 fit 状态供重置用（重置回到 fit 而非 scale=1）
+    var fitState = { scale: state.scale, x: state.x, y: state.y };
+
+    var apply = function() {
+      svg.style.transform = 'translate(' + state.x + 'px,' + state.y + 'px) scale(' + state.scale + ')';
+    };
+
+    // 以容器内某点为原点缩放（鼠标所指内容不动）
+    var zoomAt = function(newScale, cx, cy) {
+      newScale = Math.max(MIN, Math.min(MAX, newScale));
+      var wx = (cx - state.x) / state.scale;
+      var wy = (cy - state.y) / state.scale;
+      state.x = cx - wx * newScale;
+      state.y = cy - wy * newScale;
+      state.scale = newScale;
+      apply();
+    };
+
+    var center = function() {
+      return { cx: container.clientWidth / 2, cy: container.clientHeight / 2 };
+    };
+
+    // 滚轮缩放（requestAnimationFrame 节流防触控板暴冲）
+    var wheelTimer = null, pendingDelta = 0;
+    container.addEventListener('wheel', function(e) {
+      e.preventDefault();
+      var rect = container.getBoundingClientRect();
+      var cx = e.clientX - rect.left;
+      var cy = e.clientY - rect.top;
+      var norm = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 100);
+      pendingDelta += norm;
+      if (wheelTimer) return;
+      wheelTimer = requestAnimationFrame(function() {
+        var factor = pendingDelta > 0
+          ? Math.pow(1 / 1.05, Math.abs(pendingDelta) / 100)
+          : Math.pow(1.05, Math.abs(pendingDelta) / 100);
+        zoomAt(state.scale * factor, cx, cy);
+        pendingDelta = 0; wheelTimer = null;
+      });
+    }, { passive: false });
+
+    // 拖拽平移
+    var dragging = false, lastX = 0, lastY = 0;
+    container.addEventListener('mousedown', function(e) {
+      if (e.target.closest('.zoom-bar')) return;
+      dragging = true; lastX = e.clientX; lastY = e.clientY;
+    });
+    window.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      state.x += e.clientX - lastX;
+      state.y += e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      apply();
+    });
+    window.addEventListener('mouseup', function() { dragging = false; });
+
+    // 双击重置（回到 fit）
+    svg.addEventListener('dblclick', function() {
+      state.scale = fitState.scale; state.x = fitState.x; state.y = fitState.y; apply();
+    });
+
+    // 工具栏
+    var bar = document.createElement('div');
+    bar.className = 'zoom-bar';
+    var bIn = makeBtn('z-in', '放大', '＋');
+    var bOut = makeBtn('z-out', '缩小', '－');
+    var bReset = makeBtn('z-reset', '重置', '⤢');
+    var bFull = makeBtn('z-full', '全屏', '⛶');
+    bar.appendChild(bIn); bar.appendChild(bOut); bar.appendChild(bReset); bar.appendChild(bFull);
+    container.appendChild(bar);
+
+    var hint = document.createElement('div');
+    hint.className = 'zoom-hint';
+    hint.textContent = '滚轮缩放 · 拖拽平移 · 双击重置';
+    container.appendChild(hint);
+
+    bIn.onclick = function() { var c = center(); zoomAt(state.scale * 1.25, c.cx, c.cy); };
+    bOut.onclick = function() { var c = center(); zoomAt(state.scale / 1.25, c.cx, c.cy); };
+    bReset.onclick = function() { state.scale = fitState.scale; state.x = fitState.x; state.y = fitState.y; apply(); };
+    bFull.onclick = function() { openFullscreen(idx); };
+
+    apply();
+    container._pzState = state;
+  }
+
+  function initPanZoom() {
+    var charts = document.querySelectorAll('.mermaid');
+    charts.forEach(function(c, i) { setupPanZoom(c, i); });
+  }
+
+  // 全屏查看（克隆 SVG 到 overlay，独立 pan/zoom）
+  function openFullscreen(idx) {
+    var chart = document.querySelectorAll('.mermaid')[idx];
+    var svg = chart.querySelector('svg');
+    if (!svg) return;
+    var titleEl = chart.closest('.card') ? chart.closest('.card').querySelector('h3,h2,h4') : null;
+
+    var overlay = document.getElementById('fullscreen-overlay');
+    var body = document.getElementById('fullscreen-body');
+    var titleNode = document.getElementById('fullscreen-title');
+    titleNode.textContent = (titleEl && titleEl.textContent) || ('图表 ' + (idx + 1));
+
+    body.innerHTML = '';
+    var clone = svg.cloneNode(true);
+    clone.style.transform = '';
+    clone.style.width = '100%';
+    clone.style.height = '100%';
+    body.appendChild(clone);
+    overlay.classList.add('active');
+
+    var fState = { scale: 1, x: 0, y: 0 };
+    var fApply = function() {
+      clone.style.transform = 'translate(' + fState.x + 'px,' + fState.y + 'px) scale(' + fState.scale + ')';
+    };
+    var fZoomAt = function(ns, cx, cy) {
+      ns = Math.max(0.2, Math.min(8, ns));
+      var wx = (cx - fState.x) / fState.scale;
+      var wy = (cy - fState.y) / fState.scale;
+      fState.x = cx - wx * ns; fState.y = cy - wy * ns; fState.scale = ns;
+      fApply();
+    };
+    var fWheel = null, fDelta = 0;
+    body.onwheel = function(e) {
+      e.preventDefault();
+      var r = body.getBoundingClientRect();
+      var cx = e.clientX - r.left, cy = e.clientY - r.top;
+      fDelta += Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 100);
+      if (fWheel) return;
+      fWheel = requestAnimationFrame(function() {
+        var f = fDelta > 0 ? Math.pow(1/1.05, Math.abs(fDelta)/100) : Math.pow(1.05, Math.abs(fDelta)/100);
+        fZoomAt(fState.scale * f, cx, cy); fDelta = 0; fWheel = null;
+      });
+    };
+    var fDrag = false, fX = 0, fY = 0;
+    body.onmousedown = function(e) { fDrag = true; fX = e.clientX; fY = e.clientY; };
+    window.onmousemove = function(e) {
+      if (!fDrag) return;
+      fState.x += e.clientX - fX; fState.y += e.clientY - fY;
+      fX = e.clientX; fY = e.clientY; fApply();
+    };
+    window.onmouseup = function() { fDrag = false; };
+    clone.ondblclick = function() { fState.scale = 1; fState.x = 0; fState.y = 0; fApply(); };
+    fApply();
+  }
+
+  function closeFullscreen() {
+    var overlay = document.getElementById('fullscreen-overlay');
+    overlay.classList.remove('active');
+    document.getElementById('fullscreen-body').innerHTML = '';
+    window.onmousemove = null; window.onmouseup = null;
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeFullscreen();
+  });
+
+  window.addEventListener('load', function() {
+    document.querySelectorAll('.mermaid').forEach(function(c) {
+      c.dataset.mermaidSrc = c.textContent;
+    });
+  });
+
+  window.addEventListener('load', async function() {
+    await mermaid.run();
+    setTimeout(initPanZoom, 60);
+  });
+</script>
+
+</body>
+</html>
