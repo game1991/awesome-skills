@@ -38,6 +38,7 @@
   .mermaid svg{max-width:none;max-height:none;display:inline-block}
   /* 按住 Alt 进入文本选择模式：光标变文本 I，放行选词 */
   .mermaid.alt-select, .mermaid.alt-select svg{cursor:text;user-select:text;-webkit-user-select:text}
+  .fullscreen-body.alt-select, .fullscreen-body.alt-select svg{cursor:text;user-select:text;-webkit-user-select:text}
   .zoom-bar{
     position:absolute; top:10px; right:10px; z-index:20;
     display:flex; flex-direction:column; gap:4px;
@@ -320,15 +321,25 @@
         fZoomAt(fState.scale * f, cx, cy); fDelta = 0; fWheel = null;
       });
     };
+    // 全屏拖拽平移：与主图对称——preventDefault 挡选词弹右键菜单，按 Alt 放行选词，5px 阈值区分点击/拖拽
     var fDrag = false, fX = 0, fY = 0;
-    body.onmousedown = function(e) { fDrag = true; fX = e.clientX; fY = e.clientY; };
+    body.onmousedown = function(e) {
+      if (e.altKey) return;   // 按住 Alt：放行选词，不拖拽
+      e.preventDefault();
+      fDrag = true; fX = e.clientX; fY = e.clientY;
+    };
     window.onmousemove = function(e) {
       if (!fDrag) return;
       fState.x += e.clientX - fX; fState.y += e.clientY - fY;
       fX = e.clientX; fY = e.clientY; fApply();
     };
     window.onmouseup = function() { fDrag = false; };
-    clone.ondblclick = function() { fState.scale = fFit; fState.x = fCx; fState.y = fCy; fApply(); };
+    // 全屏双击重置：preventDefault 挡选词；按 Alt 放行
+    clone.ondblclick = function(e) {
+      if (e.altKey) return;
+      e.preventDefault();
+      fState.scale = fFit; fState.x = fCx; fState.y = fCy; fApply();
+    };
     fApply();
   }
 
@@ -336,19 +347,27 @@
     var overlay = document.getElementById('fullscreen-overlay');
     overlay.classList.remove('active');
     document.getElementById('fullscreen-body').innerHTML = '';
+    document.getElementById('fullscreen-body').classList.remove('alt-select');
     window.onmousemove = null; window.onmouseup = null;
   }
 
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeFullscreen();
-    if (e.key === 'Alt') document.querySelectorAll('.mermaid').forEach(function(c) { c.classList.add('alt-select'); });
+    if (e.key === 'Alt') {
+      document.querySelectorAll('.mermaid').forEach(function(c) { c.classList.add('alt-select'); });
+      document.getElementById('fullscreen-body').classList.add('alt-select');  // 全屏内同样切文本光标
+    }
   });
   document.addEventListener('keyup', function(e) {
-    if (e.key === 'Alt') document.querySelectorAll('.mermaid').forEach(function(c) { c.classList.remove('alt-select'); });
+    if (e.key === 'Alt') {
+      document.querySelectorAll('.mermaid').forEach(function(c) { c.classList.remove('alt-select'); });
+      document.getElementById('fullscreen-body').classList.remove('alt-select');
+    }
   });
   // 窗口失焦时清理 Alt 状态（避免按住 Alt 切走窗口后 class 残留）
   window.addEventListener('blur', function() {
     document.querySelectorAll('.mermaid').forEach(function(c) { c.classList.remove('alt-select'); });
+    document.getElementById('fullscreen-body').classList.remove('alt-select');
   });
 
   window.addEventListener('load', function() {

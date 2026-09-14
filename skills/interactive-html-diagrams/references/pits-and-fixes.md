@@ -177,6 +177,8 @@ clone.ondblclick = function() { fState.scale = fFit; fState.x = fCx; fState.y = 
 
 **验证**：全屏后检查 `clone.style.transform` 的 scale 非 0、图位于 overlay 正中。
 
+> **同源坑（坑8 的全屏版）**：全屏的 `body.onmousedown`/`clone.ondblclick` 若也不加 `preventDefault` + `altKey` 放行，全屏内双击同样会选词弹右键菜单、且无法 Alt 选中复制。修复时**主图与全屏必须对称**：`body.onmousedown` 加 `if(e.altKey) return; e.preventDefault();`，`clone.ondblclick` 同样；keydown/keyup 给 `fullscreen-body` 也加 `alt-select` class（CSS 要补 `.fullscreen-body.alt-select` 规则），`closeFullscreen`/`blur` 里清理该 class。详见坑8 解法。
+
 ---
 
 ## 坑8：双击重置绑在 svg 上，真实鼠标双击不触发
@@ -249,6 +251,8 @@ document.addEventListener('keyup', function(e){ if(e.key==='Alt') document.query
 window.addEventListener('blur', function(){ document.querySelectorAll('.mermaid').forEach(c=>c.classList.remove('alt-select')); });
 ```
 提示条写明"按住 Alt 选中文字"。验证：按住 Alt 光标变 I、mousedown 后无平移（拖拽被跳过）；真实拖选产生选区后 Ctrl+C 可复制（需真实键鼠，`dispatchEvent` 合不出选区）。
+
+> **全屏同理**：全屏 overlay 是独立的一套 pan/zoom（`body.onmousedown`/`clone.ondblclick`），上面三处修复（preventDefault、altKey 放行、alt-select 切光标）都必须对全屏再做一遍，否则全屏内双击仍弹右键菜单、无法 Alt 选中复制。坑7 已标注这个"主图与全屏对称"原则。
 
 ---
 
