@@ -1,0 +1,33 @@
+{
+  "name": "awesome-skills",
+  "owner": {
+    "name": "KC"
+  },
+  "plugins": [
+    {
+      "name": "touchstone",
+      "source": "./skills/touchstone",
+      "description": "Project conclusion lifecycle: BETA → RC → GA → SUPERSEDED → EOL, with user-gated archival and immutable entries"
+    },
+    {
+      "name": "ui-workflow",
+      "source": "./skills/ui-workflow",
+      "description": "Five-stage UI workflow: layered interview → HTML prototype → confirm/iterate → production code, with a pluggable component-library layer"
+    },
+    {
+      "name": "director-mode",
+      "source": "./skills/director-mode",
+      "description": "Director / lead-engineer collaboration mode: decision ledger, impact map, dual-channel reporting, gate nodes, adversarial self-verification"
+    },
+    {
+      "name": "learning-from-experience",
+      "source": "./skills/learning-from-experience",
+      "description": "Route repeated experience into SKILL.md upgrades, scripts/MCP proposals, or memory rules — without duplicating auto-memory"
+    },
+    {
+      "name": "web-search-cn",
+      "source": "./skills/web-search-cn",
+      "description": "Search the Chinese web (Baidu/Sogou fallback chain) when built-in WebSearch returns US-only results"
+    }
+  ]
+}

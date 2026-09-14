@@ -1,0 +1,4 @@
+# Local artifacts
+*.bak
+.DS_Store
+Thumbs.db
