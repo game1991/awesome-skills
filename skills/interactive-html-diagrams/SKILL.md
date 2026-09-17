@@ -79,6 +79,8 @@ Mermaid 图照常用 `<div class="mermaid">graph TB ... </div>`，JS 自动扫�
 3. console：每个图 `viewBox` 非 null
 4. console：每个图 `_pzState.scale` 非 1（大图 < 1，fit 生效）
 5. console：每个图 `_pzState.y` 等于 `(容器高 - vbH×scale)/2`（垂直居中非写死常量，见坑6）
+6. **逐图验证渲染内容，不要只数 svg 数量**：`document.body.innerHTML` 不含 "Syntax error"、无 `.error-text` 元素——mermaid 语法错误会渲染成"炸弹占位图"而非不输出 svg，数节点数发现不了（实战教训：sequenceDiagram 的 `style` 行错误占位曾被静态检查漏验）
+7. 渲染后全文 grep 残留旧表述——报告经多轮修订后，被推翻的关键词（旧基线值/旧定性词）最易残留在图内节点文本里
 6. 实测（真实鼠标，dispatchEvent 测不出坑8）：滚轮缩放 + 拖拽 + **放大后双击归位且无右键菜单/无选中文字** + 全屏（图 fit 居中）+ 全屏双击回居中 + ESC
 
 ## Deep Dive
