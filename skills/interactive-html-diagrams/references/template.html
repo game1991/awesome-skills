@@ -35,7 +35,7 @@
     padding:20px 56px 20px 20px; min-height:320px; max-height:78vh;
   }
   .mermaid:active{cursor:grabbing}
-  .mermaid svg{max-width:none;max-height:none;display:inline-block}
+  .mermaid svg{max-width:none;max-height:none;display:block;position:absolute;left:0;top:0}
   /* 按住 Alt 进入文本选择模式：光标变文本 I，放行选词 */
   .mermaid.alt-select, .mermaid.alt-select svg{cursor:text;user-select:text;-webkit-user-select:text}
   .fullscreen-body.alt-select, .fullscreen-body.alt-select svg{cursor:text;user-select:text;-webkit-user-select:text}
@@ -150,13 +150,12 @@
     var state = { scale: 1, x: 0, y: 0 };
     var MIN = 0.2, MAX = 6;
 
-    // 初始自适应 fit：图比容器大时缩小并居中，确保初始能看到全图且位于画布正中
+    // 初始自适应 fit：只缩小不放大，并按容器（padding box）居中
+    // svg 为 absolute(0,0)，transform 是唯一定位源，clientWidth/Height 与坐标系一致 → 居中无双重偏移
     var fitScale = Math.min(container.clientWidth / vbW, container.clientHeight / vbH);
-    if (fitScale < 1) {
-      state.scale = fitScale;
-      state.x = (container.clientWidth - vbW * fitScale) / 2;
-      state.y = (container.clientHeight - vbH * fitScale) / 2;
-    }
+    state.scale = Math.min(fitScale, 1);
+    state.x = (container.clientWidth - vbW * state.scale) / 2;
+    state.y = (container.clientHeight - vbH * state.scale) / 2;
     // 保存初始 fit 状态供重置用（重置回到 fit 而非 scale=1）
     var fitState = { scale: state.scale, x: state.x, y: state.y };
 
