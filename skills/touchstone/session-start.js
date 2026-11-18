@@ -17,7 +17,14 @@ process.stdin.on('end', () => {
     const lines = content.split('\n');
     const idx = lines.findIndex(l => l.includes('候选区'));
     const head = lines.slice(0, 30).join('\n');
-    const cand = idx >= 0 ? lines.length - idx : 0;
+    // 只统计「## 候选区」到下一个「## 」标题之间的 ### M- 条目，而非行数
+    let cand = 0;
+    if (idx >= 0) {
+      for (let i = idx + 1; i < lines.length; i++) {
+        if (/^##\s/.test(lines[i])) break;
+        if (/^###\s+M-\d+/.test(lines[i])) cand++;
+      }
+    }
     const out = `[touchstone] 本仓库结论基准索引区（前30行）。完整内容与写规则：读 ${f} 与 touchstone skill。候选区约 ${cand} 条待裁决${cand >= 10 ? '（已超上限，提醒用户批量裁决）' : ''}。\n` + head;
     process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: out.slice(0, 6000) } }));
   } catch { process.exit(0); }

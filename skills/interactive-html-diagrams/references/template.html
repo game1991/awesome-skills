@@ -375,9 +375,38 @@
     });
   });
 
+  // 坑9 防护①：webfont 预热——mermaid 用隐藏容器预测量节点/边标签的 foreignObject
+  // 尺寸，若测量时字体未加载（回退字体更窄），最终渲染文本比预测量宽，
+  // foreignObject 按盒子裁剪 → 标签永久缺字，console 零报错
+  var fontsReady = Promise.all([
+    document.fonts.load("400 15px Inter"),
+    document.fonts.load("700 15px Inter"),
+  ]).catch(function() {});
+
+  // 坑9 防护②：度量兜底——按真实排版尺寸扩容 foreignObject（保持中心），
+  // viewBox 扩到覆盖全部内容，字体回退/CJK 字宽等残余度量差不再裁字
+  function fixLabelOverflow(svg) {
+    svg.querySelectorAll('foreignObject').forEach(function(fo) {
+      var box = fo.firstElementChild;
+      if (!box) return;
+      var needW = Math.ceil(box.scrollWidth) + 1;
+      var needH = Math.ceil(box.scrollHeight) + 1;
+      var oldW = fo.width.baseVal.value, oldH = fo.height.baseVal.value;
+      if (needW <= oldW && needH <= oldH) return;
+      fo.setAttribute('x', fo.x.baseVal.value - (needW - oldW) / 2);
+      fo.setAttribute('y', fo.y.baseVal.value - (needH - oldH) / 2);
+      fo.setAttribute('width', needW);
+      fo.setAttribute('height', needH);
+    });
+    var b = svg.getBBox();
+    if (b.width > 0) svg.setAttribute('viewBox', b.x + ' ' + b.y + ' ' + b.width + ' ' + b.height);
+  }
+
   window.addEventListener('load', async function() {
+    await fontsReady; // 先等字体就绪，mermaid 预测量才用最终字体（必须在 mermaid.run 之前）
     await mermaid.run();
-    setTimeout(initPanZoom, 60);
+    document.querySelectorAll('.mermaid svg').forEach(fixLabelOverflow);
+    setTimeout(initPanZoom, 60); // fixLabelOverflow 之后初始化——pan/zoom 读的是已修正的 viewBox
   });
 </script>
 

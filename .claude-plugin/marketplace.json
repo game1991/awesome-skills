@@ -17,7 +17,7 @@
     {
       "name": "director-mode",
       "source": "./skills/director-mode",
-      "description": "Director / lead-engineer collaboration mode: decision ledger, impact map, dual-channel reporting, gate nodes, adversarial self-verification"
+      "description": "Director / lead-engineer collaboration mode: decision ledger, impact map, dual-channel reporting, gate nodes, adversarial self-verification, interactive todo board with four-state sign-off and comment threads"
     },
     {
       "name": "learning-from-experience",

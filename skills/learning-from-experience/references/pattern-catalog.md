@@ -48,3 +48,27 @@ Each pattern contains:
 - When 3+ MEMORY.md rules under same topic → propose SKILL.md upgrade
 - When SKILL.md contradicts MEMORY.md rule → ask user which to keep
 - When pattern status is "pending" for 2+ sessions → remind user
+
+### P004: 报告可信度审查（对抗审查+事实核查+渲染验证）
+- Keywords: 审查报告, 确保结论可靠, 根因分析审查, 发布前检查, 对抗审查, 事实核查, 渲染验证, error 占位
+- Product: `~/.kscc/skills/report-credibility-review/SKILL.md`
+- Frequency: 1
+- Status: confirmed
+- Last triggered: 2026-09-17
+- NOTE: 来源 marmot SLI 报告实战（subagent 审查抓出 4 个实质错误）；与 doubt-driven-development 边界已写入 SKILL.md
+
+### P005: skill 安装副本与上游仓库失同步
+- Keywords: skill 模板 bug, 复发, 上游仓库, awesome-skills, 同步, 手搓补丁
+- Product: MEMORY.md `dblclick-contextmenu-bug`（marmot 项目记忆）
+- Frequency: 2（2026-09 初次反馈 + 2026-09-16 复发）
+- Status: confirmed
+- Last triggered: 2026-09-17
+- NOTE: 遇模板类 bug 先对比上游 git 仓库并整体同步安装副本；已同步 interactive-html-diagrams（上游含完整交互修复）
+
+### P006: HTML 内嵌 Mermaid 渲染正确性（webfont 竞态致 foreignObject 裁字）
+- Keywords: mermaid, foreignObject, 裁字, 标签缺字, webfont, 字体预热, fonts.load, 几何断言, CLIPPED, 渲染正确性, console 零报错
+- Product: `~/.kscc/skills/interactive-html-diagrams/SKILL.md`（原则 6 + 坑表第 9 行 + 验收 REQUIRED 第 6 项）；template.html 内置 fontsReady 预热 + fixLabelOverflow；pits-and-fixes.md 坑 9 详述
+- Frequency: 1
+- Status: confirmed
+- Last triggered: 2026-10-18
+- NOTE: 真实事故——beidou-consumer-flow.html 按既有 7 项验收全过（SVG 数/viewBox/fit/console 无错）仍漏检 5 处永久裁字。两层教训：① skill 清单要按"坑族"补全（交互族之外还有渲染正确性族），不能只记当下疼的那条；② 验收断言必须区分"渲染了没有"与"渲染对了没有"，几何量测（scrollWidth ≤ FO width）是裁字唯一判据。修复范式：fonts.load 预热（根修）+ 渲染后 FO 扩容兜底，两层缺一不可

@@ -1,4 +1,4 @@
-# 5 个坑的详细根因 + 验证清单
+# 9 个坑的详细根因 + 验证清单
 
 ## 坑1：svg-pan-zoom 外部库 viewBox 为 null
 
@@ -256,6 +256,55 @@ window.addEventListener('blur', function(){ document.querySelectorAll('.mermaid'
 
 ---
 
+## 坑9：foreignObject 裁字——webfont 加载竞态致标签永久缺字（console 零报错）
+
+**现象**（真实事故，2026-10 walle 北斗文档）：节点/边标签尾部缺字——`tpl_id / stra_id / left_value` 右侧缺 24px、`notify = 1` 显示成 `notify =`。console 无任何错误，SVG 渲染数量、viewBox、fit、交互全部验收通过——**所有既有检查项都测不出它**。用户拿到文档后才截图发现。
+
+**根因**：mermaid 渲染时用隐藏容器**预测量**每个节点/边标签的 `foreignObject` 盒子尺寸。若测量时 webfont 尚未加载（Google Fonts 是异步的），mermaid 用回退字体测量——回退字体更窄 → 盒子偏小。之后 webfont 加载完成，页面 CSS 又常覆盖标签字体，最终渲染文本比盒子宽。`foreignObject` 按盒子裁剪，**超出部分永久不可见**——缩放、平移、全屏都救不回，因为是 SVG 内部裁剪而非容器 overflow。
+
+**实测数据**（headless Chrome，字体已加载仍可复现残余差）：
+```
+"tpl_id / stra_id / left_value"   foW=184.8  实际需 209   缺 24px
+"notify = 1"                      foW=63.8   实际需 72    缺 8px
+"notify = 0 / 其他"                foW=106.4  实际需 118   缺 12px
+```
+
+**解法（两层，模板已内置）**：
+
+① **根修——渲染前字体预热**（必须在 `mermaid.run()` 之前 await）：
+```js
+var fontsReady = Promise.all([
+  document.fonts.load("400 15px Inter"),   // 换成你的 themeVariables.fontFamily
+  document.fonts.load("700 15px Inter"),
+]).catch(function() {});
+// load 时序：await fontsReady → await mermaid.run() → fixLabelOverflow → initPanZoom
+```
+
+② **兜底——渲染后按真实排版扩容 foreignObject**（字体回退、CJK 字宽等残余度量差一律兜住）：
+```js
+function fixLabelOverflow(svg) {
+  svg.querySelectorAll('foreignObject').forEach(function(fo) {
+    var box = fo.firstElementChild;
+    if (!box) return;
+    var needW = Math.ceil(box.scrollWidth) + 1;
+    var needH = Math.ceil(box.scrollHeight) + 1;
+    var oldW = fo.width.baseVal.value, oldH = fo.height.baseVal.value;
+    if (needW <= oldW && needH <= oldH) return;
+    fo.setAttribute('x', fo.x.baseVal.value - (needW - oldW) / 2);  // 保持中心
+    fo.setAttribute('y', fo.y.baseVal.value - (needH - oldH) / 2);
+    fo.setAttribute('width', needW);
+    fo.setAttribute('height', needH);
+  });
+  var b = svg.getBBox();  // FO 扩容后 viewBox 同步扩，否则越界内容被外层 svg 裁掉
+  if (b.width > 0) svg.setAttribute('viewBox', b.x + ' ' + b.y + ' ' + b.width + ' ' + b.height);
+}
+```
+注意顺序：`fixLabelOverflow` 必须在 pan/zoom 初始化**之前**跑——pan/zoom 读的 viewBox 要是已修正的。
+
+**教训（为什么既有 7 项验证全绿却漏检）**：console 检查的都是"渲染了没有"（SVG 数量/viewBox/fit），裁字不产生任何错误信号。必须加**几何断言**——"渲染对了没有"（见验证清单第 7 条）。且 headless 渲染验证时字体加载时序与真实浏览器不同，无头全绿 ≠ 真实浏览器无裁剪，几何量测是唯一可靠判据。
+
+---
+
 ### 1. style 标签成对（终端）
 ```bash
 grep -n "<style>\|</style>" your.html
@@ -304,7 +353,19 @@ document.querySelectorAll('.mermaid').forEach(c => {
 // x/y 应分别等于期望值（剩余空间居中），而非写死常量如 10
 ```
 
-### 7. 交互实测（手动，必须真实鼠标，dispatchEvent 测不出坑8）
+### 7. 文本无裁剪——foreignObject 几何断言（console，坑9 唯一可靠判据）
+```js
+document.querySelectorAll('.mermaid svg').forEach((s, i) =>
+  s.querySelectorAll('foreignObject').forEach(fo => {
+    var b = fo.firstElementChild;
+    if (b && (b.scrollWidth > fo.width.baseVal.value + 1 || b.scrollHeight > fo.height.baseVal.value + 1))
+      console.log('CLIPPED 图' + i, JSON.stringify(b.textContent.slice(0, 30)),
+        'foW=' + fo.width.baseVal.value.toFixed(1), 'needW=' + b.scrollWidth);
+  }))
+// 期望：无任何 CLIPPED 输出。裁字 console 零报错，只有这个断言能抓到
+```
+
+### 8. 交互实测（手动，必须真实鼠标，dispatchEvent 测不出坑8）
 - 鼠标在图上滚轮 → 图缩放（鼠标位置不动）
 - 鼠标按住拖拽 → 图平移
 - **放大偏离后，真实鼠标双击 → 回到 fit 全图且位于画布正中**（坑8 关键验收点）

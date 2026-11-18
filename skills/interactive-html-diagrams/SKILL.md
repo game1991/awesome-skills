@@ -34,7 +34,7 @@ Mermaid 图照常用 `<div class="mermaid">graph TB ... </div>`，JS 自动扫�
 
 **完整模板见：** [references/template.html](references/template.html)
 
-## Core Principles（5 条，照搬别改）
+## Core Principles（6 条，照搬别改）
 
 | # | 原则 | 为什么 |
 |---|------|--------|
@@ -43,6 +43,7 @@ Mermaid 图照常用 `<div class="mermaid">graph TB ... </div>`，JS 自动扫�
 | 3 | 初始自适应 fit，水平垂直双向居中 | 大图 viewBox 可能 2000+px，容器仅 ~800px，scale=1 只看到左上角。初始 `fitScale=min(容器宽/vbW,容器高/vbH)` 自动缩小，x/y 都按剩余空间居中（不能只居中水平、垂直写死常量，否则图偏上不在画布正中） |
 | 4 | 重置回到 fit 而非 scale=1 | 否则大图重置后又只露左上角。保存 fitState，重置/双击都回到 fitState |
 | 5 | style 标签必须成对 | `<style>...</style>`，改样式后 `grep -n "<style>\|</style>"` 验证开=关 |
+| 6 | 渲染前字体预热 + 渲染后 foreignObject 扩容兜底（模板已内置，勿删） | webfont 竞态致 mermaid 预测量失准 → 标签永久缺字，console 零报错（坑9）；两层缺一不可 |
 
 ## Interaction Features
 
@@ -59,7 +60,7 @@ Mermaid 图照常用 `<div class="mermaid">graph TB ... </div>`，JS 自动扫�
 
 > **为什么选中复制要按 Alt**：拖拽平移和文本选中都是 mousedown+mousemove，天然冲突。默认走拖拽（`preventDefault` 挡住误选/双击弹右键菜单），按 Alt 时放行浏览器原生选词——既不破坏平移，又能复制节点文字。
 
-## Common Mistakes（8 个坑，详见 references/pits-and-fixes.md）
+## Common Mistakes（9 个坑，详见 references/pits-and-fixes.md）
 
 | 坑 | 现象 | 根因 | 解法 |
 |----|------|------|------|
@@ -71,6 +72,7 @@ Mermaid 图照常用 `<div class="mermaid">graph TB ... </div>`，JS 自动扫�
 | fit 垂直不居中 | 图偏上不在画布正中，宽扁图尤甚 | `state.y=10` 写死常量，只水平居中 | y 也按 `(容器高-vbH*scale)/2` 居中 |
 | 全屏没 fit 居中 | 全屏后大图只露局部或拉伸变形 | clone 宽高设 100%、初始 scale=1、重置回 0,0 | 全屏复用 fit 逻辑，双击回 fit 居中 |
 | 双击重置不触发/弹右键菜单 | 真实双击图没反应或选中文字弹右键菜单 | dblclick 绑 svg 子节点命中被吞；拖拽无阈值抖动拖走图；缺 preventDefault 双击选词 | dblclick 绑 container + 拖拽 5px 阈值 + 两处 preventDefault |
+| foreignObject 裁字 | 标签尾部缺字（`notify = 1` 显示成 `notify =`），**console 零报错** | mermaid 预测量时 webfont 未加载，回退字体更窄；渲染后 foreignObject 按盒子裁剪 | 渲染前 `fonts.load` 预热 + 渲染后按 scrollWidth 扩容 FO（模板已内置，勿删） |
 
 ## Verification（每次必跑）
 
@@ -79,9 +81,17 @@ Mermaid 图照常用 `<div class="mermaid">graph TB ... </div>`，JS 自动扫�
 3. console：每个图 `viewBox` 非 null
 4. console：每个图 `_pzState.scale` 非 1（大图 < 1，fit 生效）
 5. console：每个图 `_pzState.y` 等于 `(容器高 - vbH×scale)/2`（垂直居中非写死常量，见坑6）
-6. **逐图验证渲染内容，不要只数 svg 数量**：`document.body.innerHTML` 不含 "Syntax error"、无 `.error-text` 元素——mermaid 语法错误会渲染成"炸弹占位图"而非不输出 svg，数节点数发现不了（实战教训：sequenceDiagram 的 `style` 行错误占位曾被静态检查漏验）
-7. 渲染后全文 grep 残留旧表述——报告经多轮修订后，被推翻的关键词（旧基线值/旧定性词）最易残留在图内节点文本里
-6. 实测（真实鼠标，dispatchEvent 测不出坑8）：滚轮缩放 + 拖拽 + **放大后双击归位且无右键菜单/无选中文字** + 全屏（图 fit 居中）+ 全屏双击回居中 + ESC
+6. **REQUIRED 文本无裁剪**（console，裁字零报错，坑9 唯一判据）：
+   ```js
+   document.querySelectorAll('.mermaid svg').forEach((s, i) =>
+     s.querySelectorAll('foreignObject').forEach(fo => {
+       var b = fo.firstElementChild;
+       if (b && (b.scrollWidth > fo.width.baseVal.value + 1 || b.scrollHeight > fo.height.baseVal.value + 1))
+         console.log('CLIPPED 图' + i, b.textContent.slice(0, 30));
+     }))
+   ```
+   期望：无任何 `CLIPPED` 输出。有输出 = webfont 竞态裁字，模板的预热+扩容防护被删或未拷全。
+7. 实测（真实鼠标，dispatchEvent 测不出坑8）：滚轮缩放 + 拖拽 + **放大后双击归位且无右键菜单/无选中文字** + 全屏（图 fit 居中）+ 全屏双击回居中 + ESC
 
 ## Deep Dive
 

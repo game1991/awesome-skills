@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<!--
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  Director Mode · 待办决策看板模板                                     ║
+  ║                                                                      ║
+  ║  用法：复制本文件到项目 docs/YYYYMMDD-todo-checklist.html，          ║
+  ║        只改「配置区」四行 + TODOS 数组，其余不要动。                  ║
+  ║                                                                      ║
+  ║  状态语义（不可自行发挥）：                                           ║
+  ║    未确认   = 暂不处理，下一轮继续出现                                ║
+  ║    已确认   = 该项仍有效、需要推进（≠ 已完成）                        ║
+  ║    已完成   = 已交付并验证                                            ║
+  ║    已忽略   = 主动放弃，须能说出理由                                  ║
+  ║                                                                      ║
+  ║  条目字段契约（缺一不可）：                                           ║
+  ║    priority  P1 / P2 / P3                                            ║
+  ║    owner     'ours'（我方） | 'external'（外部，标题里写清是哪一方）   ║
+  ║    title     一句话功能影响（禁止函数名/文件路径/表名）               ║
+  ║    detail    为什么还没做 + 卡点在哪（禁止实现方案）                  ║
+  ║    refs      里程碑编号 / 文档锚点（必须可追溯）                      ║
+  ║    comments  预置评论数组（可空），可省略；运行时评论追加到此          ║
+  ║                                                                      ║
+  ║  评论（对话式补充）：                                                 ║
+  ║    每条待办可展开评论抽屉，总监与主程双向留言，按时间排序留痕。        ║
+  ║    Enter 发送 / Shift+Enter 换行 / Esc 关闭。                         ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>待办确认清单</title>
+<style>
+  :root{
+    --font-body:"Geist","Segoe UI Variable","Segoe UI","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+    --font-mono:"JetBrains Mono","Cascadia Code","Consolas","Noto Sans Mono CJK SC",monospace;
+
+    --bg:#080b12;
+    --surface:#111826;
+    --surface-2:#16202f;
+    --surface-3:#1c2839;
+    --line:rgba(148,163,184,.14);
+    --line-strong:rgba(148,163,184,.28);
+
+    --text:#e6edf7;
+    --text-2:#9fb0c8;
+    --text-3:#6b7f99;
+
+    --accent:#38bdf8;
+    --accent-soft:rgba(56,189,248,.12);
+    --violet:#a78bfa;
+    --violet-soft:rgba(167,139,250,.12);
+    --ok:#34d399;
+    --ok-soft:rgba(52,211,153,.12);
+    --warn:#fbbf24;
+    --warn-soft:rgba(251,191,36,.12);
+    --danger:#f87171;
+    --danger-soft:rgba(248,113,113,.12);
+
+    --radius:14px;
+    --radius-sm:9px;
+
+    font-synthesis:none;
+    line-break:strict;
+    overflow-wrap:break-word;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    min-height:100vh;
+    padding:40px 24px 96px;
+    font-family:var(--font-body);
+    font-size:16px;
+    line-height:1.7;
+    color:var(--text);
+    background:
+      radial-gradient(1200px 600px at 12% -8%, rgba(56,189,248,.10), transparent 60%),
+      radial-gradient(900px 520px at 92% 0%, rgba(167,139,250,.10), transparent 55%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .wrap{max-width:1080px;margin:0 auto;}
+
+  .hero-top{
+    display:flex;align-items:flex-start;justify-content:space-between;
+    gap:24px;flex-wrap:wrap;margin-bottom:28px;
+  }
+  .eyebrow{
+    margin:0 0 8px;font-size:12px;font-weight:600;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--accent);
+  }
+  h1{
+    margin:0 0 10px;font-size:34px;line-height:1.25;letter-spacing:-.01em;
+    font-weight:700;text-wrap:balance;
+  }
+  .sub{
+    margin:0;max-width:62ch;color:var(--text-2);font-size:15px;
+    text-wrap:pretty;
+  }
+  .sub b{color:var(--text);font-weight:600;}
+
+  .actions{display:flex;gap:10px;flex-shrink:0;padding-top:6px;}
+  .btn{
+    appearance:none;cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:600;
+    padding:9px 16px;border-radius:var(--radius-sm);
+    border:1px solid var(--line-strong);background:var(--surface-2);color:var(--text-2);
+    transition:all .16s ease;
+  }
+  .btn:hover{color:var(--text);border-color:var(--accent);background:var(--surface-3);}
+  .btn.danger:hover{color:var(--danger);border-color:var(--danger);background:var(--danger-soft);}
+  .btn.primary{color:#08111d;background:var(--accent);border-color:var(--accent);}
+  .btn.primary:hover{background:#5cc9fa;color:#08111d;}
+
+  .stats{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;
+  }
+  .stat{
+    background:linear-gradient(180deg,var(--surface),var(--surface-2));
+    border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;position:relative;overflow:hidden;
+  }
+  .stat::after{
+    content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--text-3);opacity:.5;
+  }
+  .stat.s-pending::after{background:var(--warn);}
+  .stat.s-confirmed::after{background:var(--accent);}
+  .stat.s-closed::after{background:var(--ok);}
+  .stat-label{display:block;font-size:12.5px;color:var(--text-3);letter-spacing:.02em;margin-bottom:4px;}
+  .stat-num{
+    font-size:28px;font-weight:700;line-height:1.1;
+    font-variant-numeric:tabular-nums;letter-spacing:-.01em;
+  }
+
+  .progress{
+    height:6px;border-radius:999px;background:var(--surface-3);
+    overflow:hidden;margin-bottom:28px;border:1px solid var(--line);
+  }
+  .progress-fill{
+    height:100%;width:0;border-radius:999px;
+    background:linear-gradient(90deg,var(--accent),var(--violet));
+    transition:width .35s cubic-bezier(.2,.8,.2,1);
+  }
+
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+  .chip{
+    appearance:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;
+    padding:7px 14px;border-radius:999px;
+    border:1px solid var(--line);background:transparent;color:var(--text-3);
+    transition:all .15s ease;font-variant-numeric:tabular-nums;
+  }
+  .chip:hover{color:var(--text-2);border-color:var(--line-strong);}
+  .chip[aria-selected="true"]{
+    color:var(--accent);border-color:rgba(56,189,248,.45);background:var(--accent-soft);
+  }
+
+  .list{display:flex;flex-direction:column;gap:10px;}
+
+  .task{
+    display:flex;gap:16px;align-items:flex-start;
+    padding:18px 20px;border-radius:var(--radius);
+    background:var(--surface);border:1px solid var(--line);
+    border-left:3px solid transparent;
+    transition:border-color .18s ease, background .18s ease, opacity .2s ease;
+    animation:rise .26s ease both;
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  .task:hover{border-color:var(--line-strong);border-left-color:var(--line-strong);}
+  .task.is-confirmed{border-left-color:var(--accent);background:linear-gradient(90deg,var(--accent-soft),var(--surface) 40%);}
+  .task.is-closed{opacity:.55;border-left-color:var(--ok);}
+  .task.is-closed:hover{opacity:.8;}
+
+  .check{
+    appearance:none;cursor:pointer;flex-shrink:0;
+    width:22px;height:22px;margin-top:2px;border-radius:7px;
+    border:1.8px solid var(--line-strong);background:transparent;
+    display:grid;place-items:center;transition:all .16s ease;padding:0;
+  }
+  .check:hover{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);}
+  .check svg{width:13px;height:13px;opacity:0;transform:scale(.6);transition:all .16s ease;}
+  .check[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);}
+  .check[aria-pressed="true"] svg{opacity:1;transform:none;}
+
+  .task-body{flex:1;min-width:0;}
+  .task-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:6px;}
+
+  .badge{
+    font-size:11.5px;font-weight:700;letter-spacing:.03em;
+    padding:2px 8px;border-radius:5px;line-height:1.5;white-space:nowrap;
+  }
+  .badge.p1{color:var(--danger);background:var(--danger-soft);}
+  .badge.p2{color:var(--warn);background:var(--warn-soft);}
+  .badge.p3{color:var(--text-2);background:rgba(148,163,184,.12);}
+  .badge.ours{color:var(--accent);background:var(--accent-soft);}
+  .badge.ext{color:var(--violet);background:var(--violet-soft);}
+  .badge.st-pending{color:var(--text-3);background:rgba(148,163,184,.10);}
+  .badge.st-confirmed{color:var(--accent);background:var(--accent-soft);}
+  .badge.st-done{color:var(--ok);background:var(--ok-soft);}
+  .badge.st-ignored{color:var(--text-3);background:rgba(148,163,184,.10);}
+
+  .task h3{
+    margin:0 0 5px;font-size:16px;font-weight:600;line-height:1.5;letter-spacing:0;
+    text-wrap:pretty;
+  }
+  .task.is-closed h3{text-decoration:line-through;text-decoration-color:var(--text-3);color:var(--text-2);}
+  .detail{
+    margin:0;font-size:13.5px;line-height:1.75;color:var(--text-2);max-width:74ch;
+    text-wrap:pretty;
+  }
+  .detail code{
+    font-family:var(--font-mono);font-size:12.5px;
+    padding:1px 5px;border-radius:4px;background:var(--surface-3);
+    border:1px solid var(--line);color:var(--accent);
+  }
+  .refs{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center;}
+  .ref{
+    font-size:11.5px;color:var(--text-3);font-family:var(--font-mono);
+    border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+  }
+  .comment-pill{
+    appearance:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;
+    color:var(--text-2);background:rgba(148,163,184,.10);
+    border:1px solid var(--line);border-radius:999px;padding:2px 10px;
+    transition:all .15s ease;
+  }
+  .comment-pill:hover{color:var(--accent);border-color:rgba(56,189,248,.45);background:var(--accent-soft);}
+  .comment-pill .dot{color:var(--accent);}
+
+  .task-actions{
+    display:flex;flex-direction:column;gap:6px;flex-shrink:0;
+    align-self:center;min-width:92px;
+  }
+  .act{
+    appearance:none;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;
+    padding:7px 12px;border-radius:var(--radius-sm);white-space:nowrap;
+    border:1px solid var(--line-strong);background:transparent;color:var(--text-2);
+    transition:all .15s ease;
+  }
+  .act:hover{background:var(--surface-3);color:var(--text);}
+  .act.done:hover{color:var(--ok);border-color:var(--ok);background:var(--ok-soft);}
+  .act.ignore:hover{color:var(--text-3);border-color:var(--line-strong);}
+  .act.undo:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-soft);}
+  .act.comment:hover{color:var(--violet);border-color:var(--violet);background:var(--violet-soft);}
+
+  .empty{
+    text-align:center;padding:56px 24px;border:1px dashed var(--line-strong);
+    border-radius:var(--radius);color:var(--text-3);font-size:14.5px;
+  }
+  .empty strong{display:block;font-size:18px;color:var(--text-2);margin-bottom:6px;font-weight:600;}
+
+  .foot{
+    margin-top:32px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    font-size:12.5px;color:var(--text-3);border-top:1px solid var(--line);padding-top:16px;
+  }
+  .foot b{color:var(--text-2);font-weight:600;}
+
+  .toast{
+    position:fixed;left:50%;bottom:32px;transform:translate(-50%,16px);
+    background:var(--surface-3);border:1px solid var(--line-strong);
+    color:var(--text);font-size:13.5px;font-weight:500;
+    padding:10px 20px;border-radius:999px;opacity:0;pointer-events:none;
+    transition:all .22s ease;box-shadow:0 12px 32px rgba(0,0,0,.4);z-index:90;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+
+  /* ---------- 评论抽屉 ---------- */
+  .drawer-mask{
+    position:fixed;inset:0;z-index:60;
+    background:rgba(4,8,14,.62);backdrop-filter:blur(3px);
+    opacity:0;pointer-events:none;transition:opacity .26s ease;
+  }
+  .drawer-mask.open{opacity:1;pointer-events:auto;}
+
+  .drawer{
+    position:fixed;top:0;right:0;z-index:70;
+    height:100%;width:min(500px,100%);
+    display:flex;flex-direction:column;
+    background:linear-gradient(180deg,#0f1724,#0b1220);
+    border-left:1px solid var(--line-strong);
+    box-shadow:-24px 0 64px rgba(0,0,0,.5);
+    transform:translateX(100%);
+    transition:transform .3s cubic-bezier(.2,.8,.2,1);
+  }
+  .drawer.open{transform:none;}
+
+  .drawer-head{
+    flex-shrink:0;padding:22px 24px 18px;
+    border-bottom:1px solid var(--line);
+    display:flex;align-items:flex-start;justify-content:space-between;gap:14px;
+  }
+  .drawer-badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+  .drawer-head h2{
+    margin:0;font-size:17px;font-weight:600;line-height:1.55;letter-spacing:0;
+    color:var(--text);text-wrap:pretty;
+  }
+  .drawer-close{
+    appearance:none;cursor:pointer;flex-shrink:0;
+    width:32px;height:32px;border-radius:9px;
+    border:1px solid var(--line-strong);background:transparent;color:var(--text-2);
+    font-size:19px;line-height:1;display:grid;place-items:center;
+    transition:all .15s ease;
+  }
+  .drawer-close:hover{color:var(--danger);border-color:var(--danger);background:var(--danger-soft);}
+
+  .drawer-body{
+    flex:1;overflow-y:auto;padding:20px 24px;
+    display:flex;flex-direction:column;gap:14px;
+  }
+  .drawer-body::-webkit-scrollbar{width:8px;}
+  .drawer-body::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:4px;}
+
+  .bubble{max-width:88%;display:flex;flex-direction:column;gap:4px;animation:rise .24s ease both;}
+  .bubble.mine{align-self:flex-end;align-items:flex-end;}
+  .bubble.theirs{align-self:flex-start;align-items:flex-start;}
+  .bubble-text{
+    font-size:13.5px;line-height:1.75;white-space:pre-wrap;
+    padding:11px 15px;border-radius:12px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--text);
+    text-wrap:pretty;
+  }
+  .bubble.mine .bubble-text{
+    background:var(--accent-soft);border-color:rgba(56,189,248,.35);
+  }
+  .bubble-meta{
+    font-size:11.5px;color:var(--text-3);font-variant-numeric:tabular-nums;
+    display:flex;align-items:center;gap:8px;
+  }
+  .bubble-del{
+    appearance:none;cursor:pointer;font-family:inherit;font-size:11px;
+    color:var(--text-3);background:transparent;border:none;padding:0;
+    opacity:0;transition:opacity .15s ease;
+  }
+  .bubble:hover .bubble-del{opacity:1;}
+  .bubble-del:hover{color:var(--danger);}
+
+  .drawer-empty{
+    margin:auto;text-align:center;color:var(--text-3);font-size:13.5px;
+    padding:40px 0;
+  }
+  .drawer-empty strong{display:block;color:var(--text-2);font-size:15px;margin-bottom:6px;font-weight:600;}
+
+  .drawer-foot{
+    flex-shrink:0;padding:14px 20px 20px;
+    border-top:1px solid var(--line);background:rgba(17,24,38,.7);
+  }
+  .drawer-foot textarea{
+    width:100%;resize:vertical;min-height:74px;
+    font-family:inherit;font-size:13.5px;line-height:1.7;
+    padding:11px 14px;border-radius:var(--radius-sm);
+    border:1px solid var(--line-strong);background:var(--surface);color:var(--text);
+    outline:none;transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .drawer-foot textarea::placeholder{color:var(--text-3);}
+  .drawer-foot textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .drawer-foot-actions{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;
+  }
+  .hint{font-size:11.5px;color:var(--text-3);}
+
+  @media (max-width:720px){
+    body{padding:28px 16px 72px;}
+    h1{font-size:27px;}
+    .stats{grid-template-columns:repeat(2,1fr);}
+    .task{flex-wrap:wrap;gap:12px;padding:16px;}
+    .task-actions{flex-direction:row;width:100%;justify-content:flex-end;align-self:auto;flex-wrap:wrap;}
+    .act{flex:1;}
+    .drawer{width:100%;}
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <header class="hero-top">
+    <div>
+      <p class="eyebrow" id="eyebrow">PROJECT · 待办确认</p>
+      <h1 id="pageTitle">待办确认清单</h1>
+      <p class="sub">
+        勾选 <b>「已确认」</b> 表示该待办仍然有效；确认后选择 <b>「已完成」</b> 或 <b>「忽略关闭」</b> 将其从列表关闭。
+        点击 <b>「评论」</b> 可就单条待办补充说明，形成对话留痕。状态自动保存在本机浏览器。
+      </p>
+    </div>
+    <div class="actions">
+      <button class="btn" id="exportBtn" type="button">复制摘要</button>
+      <button class="btn danger" id="resetBtn" type="button">重置</button>
+    </div>
+  </header>
+
+  <section class="stats" aria-label="统计">
+    <div class="stat"><span class="stat-label">总待办</span><span class="stat-num" id="nTotal">0</span></div>
+    <div class="stat s-pending"><span class="stat-label">未确认</span><span class="stat-num" id="nPending">0</span></div>
+    <div class="stat s-confirmed"><span class="stat-label">已确认</span><span class="stat-num" id="nConfirmed">0</span></div>
+    <div class="stat s-closed"><span class="stat-label">已关闭</span><span class="stat-num" id="nClosed">0</span></div>
+  </section>
+
+  <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progressBar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <nav class="filters" aria-label="筛选">
+    <button class="chip" type="button" data-filter="all" aria-selected="true">全部</button>
+    <button class="chip" type="button" data-filter="pending" aria-selected="false">未确认</button>
+    <button class="chip" type="button" data-filter="confirmed" aria-selected="false">已确认</button>
+    <button class="chip" type="button" data-filter="closed" aria-selected="false">已关闭</button>
+  </nav>
+
+  <section class="list" id="list" aria-live="polite"></section>
+
+  <footer class="foot">
+    <span>数据来源：<b id="sourceLabel">—</b></span>
+    <span>生成于 <b id="dateLabel">—</b> · 最后保存 <b id="savedAt">—</b></span>
+  </footer>
+
+</main>
+
+<!-- 评论抽屉 -->
+<div class="drawer-mask" id="drawerMask"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+  <header class="drawer-head">
+    <div>
+      <div class="drawer-badges" id="drawerBadges"></div>
+      <h2 id="drawerTitle">—</h2>
+    </div>
+    <button class="drawer-close" id="drawerClose" type="button" aria-label="关闭评论">×</button>
+  </header>
+  <div class="drawer-body" id="drawerBody"></div>
+  <footer class="drawer-foot">
+    <textarea id="commentInput" placeholder="补充说明…（Enter 发送，Shift + Enter 换行）" rows="3"></textarea>
+    <div class="drawer-foot-actions">
+      <span class="hint">Enter 发送 · Shift + Enter 换行</span>
+      <button class="btn primary" id="commentSubmit" type="button">发送</button>
+    </div>
+  </footer>
+</aside>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ═══════════════════════════════════════════════════════════════
+     配 置 区 —— 只改这一段
+     ═══════════════════════════════════════════════════════════════ */
+
+  var CONFIG = {
+    project: 'PROJECT_NAME',                 // 项目名（英文，用于眉标）
+    title: '待办确认清单',                    // 页面标题
+    date: 'YYYY-MM-DD',                      // 生成日期
+    source: 'TOUCHSTONE.md 跨域待办',          // 数据来源（可写多个，顿号分隔）
+    storeKey: 'PROJECT_NAME_todo_YYYYMMDD_v1' // 浏览器存储 key，换日期即换版本
+  };
+
+  // 条目字段契约：id / priority / owner / title / detail / refs / comments?
+  // owner: 'ours' = 我方；'external' = 外部（在 title 里写明是哪一方）
+  // comments: 可省略；预置评论 author 为 '主程'，总监的评论运行时追加
+  var TODOS = [
+    {
+      id: 'example-p1',
+      priority: 'P1',
+      owner: 'ours',
+      title: '一句话描述这项待办达成的功能影响',
+      detail: '为什么还没做 + 卡点在哪。禁止写实现方案、代码片段、函数名。',
+      refs: ['M-000'],
+      comments: [
+        { author: '主程', at: 'YYYY-MM-DD HH:mm', text: '预置说明：当前卡在等待外部回执，预计下一轮可推进。' }
+      ]
+    },
+    {
+      id: 'example-external',
+      priority: 'P2',
+      owner: 'external',
+      title: '需要外部方回执的事项（标题里写明是哪一方）',
+      detail: '说明等待对方确认的内容，以及阻塞了哪些功能。',
+      refs: ['M-000', 'docs/xxx.md']
+    }
+  ];
+
+  /* ═══════════════════════════════════════════════════════════════
+     以下为渲染逻辑，不要修改
+     ═══════════════════════════════════════════════════════════════ */
+
+  var STATUS_TEXT = { pending: '未确认', confirmed: '已确认', done: '已完成', ignored: '已忽略' };
+  var STATUS_CLASS = { pending: 'st-pending', confirmed: 'st-confirmed', done: 'st-done', ignored: 'st-ignored' };
+  var ORDER = { pending: 0, confirmed: 1, done: 2, ignored: 3 };
+  var ME = '总监';
+
+  var state = {};
+  var comments = {};   // id -> [{author, at, text}]
+  var drafts = {};     // id -> 未提交的输入草稿
+  var openId = null;   // 当前打开评论的待办 id
+  var filter = 'all';
+  var savedAt = '—';
+
+  var listEl = document.getElementById('list');
+  var toastEl = document.getElementById('toast');
+  var drawerEl = document.getElementById('drawer');
+  var maskEl = document.getElementById('drawerMask');
+  var drawerBodyEl = document.getElementById('drawerBody');
+  var drawerTitleEl = document.getElementById('drawerTitle');
+  var drawerBadgesEl = document.getElementById('drawerBadges');
+  var commentInputEl = document.getElementById('commentInput');
+
+  document.getElementById('eyebrow').textContent = CONFIG.project + ' · 待办确认';
+  document.getElementById('pageTitle').textContent = CONFIG.title;
+  document.getElementById('sourceLabel').textContent = CONFIG.source;
+  document.getElementById('dateLabel').textContent = CONFIG.date;
+
+  function todoById(id) {
+    for (var i = 0; i < TODOS.length; i++) if (TODOS[i].id === id) return TODOS[i];
+    return null;
+  }
+
+  function now() {
+    var d = new Date();
+    function p(n) { return n < 10 ? '0' + n : String(n); }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+      ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /* ---------- 存储 ---------- */
+  function load() {
+    var baseState = {};
+    var baseComments = {};
+
+    TODOS.forEach(function (t) {
+      baseState[t.id] = 'pending';
+      baseComments[t.id] = (t.comments || []).slice();
+    });
+
+    try {
+      var raw = localStorage.getItem(CONFIG.storeKey);
+      if (!raw) return { state: baseState, comments: baseComments, drafts: {} };
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return { state: baseState, comments: baseComments, drafts: {} };
+
+      TODOS.forEach(function (t) {
+        var v = parsed.state && parsed.state[t.id];
+        if (v && STATUS_TEXT[v]) baseState[t.id] = v;
+        if (parsed.comments && Array.isArray(parsed.comments[t.id])) {
+          baseComments[t.id] = parsed.comments[t.id];
+        }
+      });
+      if (parsed.savedAt) savedAt = parsed.savedAt;
+      return { state: baseState, comments: baseComments, drafts: parsed.drafts || {} };
+    } catch (e) {
+      return { state: baseState, comments: baseComments, drafts: {} };
+    }
+  }
+
+  function save() {
+    savedAt = new Date().toLocaleString('zh-CN', { hour12: false });
+    try {
+      localStorage.setItem(CONFIG.storeKey, JSON.stringify({
+        state: state,
+        comments: comments,
+        drafts: drafts,
+        savedAt: savedAt
+      }));
+    } catch (e) { /* 忽略写入失败 */ }
+  }
+
+  /* ---------- 列表渲染 ---------- */
+  function isClosed(s) { return s === 'done' || s === 'ignored'; }
+
+  function matches(t) {
+    var s = state[t.id];
+    if (filter === 'all') return true;
+    if (filter === 'closed') return isClosed(s);
+    return s === filter;
+  }
+
+  function card(t) {
+    var s = state[t.id];
+    var confirmed = s === 'confirmed';
+    var closed = isClosed(s);
+    var list = comments[t.id] || [];
+
+    var actions = '';
+    if (confirmed) {
+      actions =
+        '<button class="act done" type="button" data-act="done" data-id="' + t.id + '">已完成</button>' +
+        '<button class="act ignore" type="button" data-act="ignored" data-id="' + t.id + '">忽略关闭</button>';
+    } else if (closed) {
+      actions = '<button class="act undo" type="button" data-act="undo" data-id="' + t.id + '">撤销</button>';
+    } else {
+      actions = '<button class="act" type="button" data-act="confirm" data-id="' + t.id + '">确认</button>';
+    }
+    actions += '<button class="act comment" type="button" data-act="comment" data-id="' + t.id + '">评论' +
+      (list.length ? ' (' + list.length + ')' : '') + '</button>';
+
+    var pill = list.length
+      ? '<button class="comment-pill" type="button" data-act="comment" data-id="' + t.id + '">' +
+          '<span class="dot">●</span> ' + list.length + ' 条评论</button>'
+      : '';
+
+    return '' +
+      '<article class="task' + (confirmed ? ' is-confirmed' : '') + (closed ? ' is-closed' : '') + '" data-id="' + t.id + '">' +
+        '<button class="check" type="button" data-act="toggle" data-id="' + t.id + '" aria-pressed="' + (s !== 'pending') + '" aria-label="确认待办：' + esc(t.title) + '">' +
+          '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 5" stroke="#08111d" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        '</button>' +
+        '<div class="task-body">' +
+          '<div class="task-head">' +
+            '<span class="badge ' + t.priority.toLowerCase() + '">' + t.priority + '</span>' +
+            '<span class="badge ' + (t.owner === 'ours' ? 'ours' : 'ext') + '">' + (t.owner === 'ours' ? '我方' : '外部') + '</span>' +
+            '<span class="badge ' + STATUS_CLASS[s] + '">' + STATUS_TEXT[s] + '</span>' +
+          '</div>' +
+          '<h3>' + t.title + '</h3>' +
+          '<p class="detail">' + t.detail + '</p>' +
+          '<div class="refs">' + t.refs.map(function (r) { return '<span class="ref">' + r + '</span>'; }).join('') + pill + '</div>' +
+        '</div>' +
+        '<div class="task-actions">' + actions + '</div>' +
+      '</article>';
+  }
+
+  function render() {
+    var counts = { pending: 0, confirmed: 0, closed: 0 };
+    TODOS.forEach(function (t) {
+      var s = state[t.id];
+      if (s === 'pending') counts.pending++;
+      else if (s === 'confirmed') counts.confirmed++;
+      else counts.closed++;
+    });
+
+    document.getElementById('nTotal').textContent = TODOS.length;
+    document.getElementById('nPending').textContent = counts.pending;
+    document.getElementById('nConfirmed').textContent = counts.confirmed;
+    document.getElementById('nClosed').textContent = counts.closed;
+
+    var pct = TODOS.length ? Math.round(((counts.confirmed + counts.closed) / TODOS.length) * 100) : 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressBar').setAttribute('aria-valuenow', String(pct));
+    document.getElementById('savedAt').textContent = savedAt;
+
+    var visible = TODOS.filter(matches).slice().sort(function (a, b) {
+      var d = ORDER[state[a.id]] - ORDER[state[b.id]];
+      return d !== 0 ? d : TODOS.indexOf(a) - TODOS.indexOf(b);
+    });
+
+    if (!visible.length) {
+      var msg = filter === 'closed' ? '还没有关闭任何待办' : '当前筛选下没有待办';
+      listEl.innerHTML = '<div class="empty"><strong>' + msg + '</strong>切换筛选条件查看其他待办。</div>';
+      return;
+    }
+    listEl.innerHTML = visible.map(card).join('');
+  }
+
+  /* ---------- 评论抽屉 ---------- */
+  function renderDrawer() {
+    var t = todoById(openId);
+    if (!t) return;
+    var s = state[t.id];
+    var list = comments[t.id] || [];
+
+    drawerTitleEl.textContent = t.title;
+    drawerBadgesEl.innerHTML =
+      '<span class="badge ' + t.priority.toLowerCase() + '">' + t.priority + '</span>' +
+      '<span class="badge ' + (t.owner === 'ours' ? 'ours' : 'ext') + '">' + (t.owner === 'ours' ? '我方' : '外部') + '</span>' +
+      '<span class="badge ' + STATUS_CLASS[s] + '">' + STATUS_TEXT[s] + '</span>';
+
+    if (!list.length) {
+      drawerBodyEl.innerHTML =
+        '<div class="drawer-empty"><strong>还没有评论</strong>就这条待办补充你的判断或补充信息。</div>';
+    } else {
+      drawerBodyEl.innerHTML = list.map(function (c, i) {
+        var mine = c.author === ME;
+        return '' +
+          '<div class="bubble ' + (mine ? 'mine' : 'theirs') + '">' +
+            '<div class="bubble-text">' + esc(c.text) + '</div>' +
+            '<div class="bubble-meta">' +
+              '<span>' + esc(c.author) + ' · ' + esc(c.at) + '</span>' +
+              '<button class="bubble-del" type="button" data-del="' + i + '">删除</button>' +
+            '</div>' +
+          '</div>';
+      }).join('');
+      drawerBodyEl.scrollTop = drawerBodyEl.scrollHeight;
+    }
+
+    commentInputEl.value = drafts[t.id] || '';
+  }
+
+  function openDrawer(id) {
+    openId = id;
+    renderDrawer();
+    drawerEl.classList.add('open');
+    maskEl.classList.add('open');
+    setTimeout(function () { commentInputEl.focus(); }, 120);
+  }
+
+  function closeDrawer() {
+    if (openId && drafts[openId]) save();
+    openId = null;
+    drawerEl.classList.remove('open');
+    maskEl.classList.remove('open');
+  }
+
+  function submitComment() {
+    if (!openId) return;
+    var text = commentInputEl.value.trim();
+    if (!text) { toast('评论内容不能为空'); return; }
+    if (!comments[openId]) comments[openId] = [];
+    comments[openId].push({ author: ME, at: now(), text: text });
+    drafts[openId] = '';
+    commentInputEl.value = '';
+    save();
+    renderDrawer();
+    render();
+    toast('评论已添加');
+  }
+
+  /* ---------- 交互 ---------- */
+  function setStatus(id, next) {
+    state[id] = next;
+    save();
+    render();
+    if (openId === id) renderDrawer();
+  }
+
+  listEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    var id = btn.getAttribute('data-id');
+    var act = btn.getAttribute('data-act');
+    if (!id || !state.hasOwnProperty(id)) return;
+
+    if (act === 'toggle') {
+      setStatus(id, state[id] === 'pending' ? 'confirmed' : 'pending');
+    } else if (act === 'confirm') {
+      setStatus(id, 'confirmed');
+    } else if (act === 'done') {
+      setStatus(id, 'done');
+      toast('已标记完成');
+    } else if (act === 'ignored') {
+      setStatus(id, 'ignored');
+      toast('已忽略关闭');
+    } else if (act === 'undo') {
+      setStatus(id, 'confirmed');
+    } else if (act === 'comment') {
+      openDrawer(id);
+    }
+  });
+
+  drawerBodyEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-del]');
+    if (!btn || !openId) return;
+    var idx = parseInt(btn.getAttribute('data-del'), 10);
+    var list = comments[openId] || [];
+    if (!list[idx]) return;
+    if (!window.confirm('删除这条评论？')) return;
+    list.splice(idx, 1);
+    save();
+    renderDrawer();
+    render();
+    toast('评论已删除');
+  });
+
+  commentInputEl.addEventListener('input', function () {
+    if (openId) drafts[openId] = commentInputEl.value;
+  });
+
+  commentInputEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      submitComment();
+    }
+  });
+
+  document.getElementById('commentSubmit').addEventListener('click', submitComment);
+
+  document.getElementById('drawerClose').addEventListener('click', closeDrawer);
+  maskEl.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && openId) closeDrawer();
+  });
+
+  document.querySelectorAll('.chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      filter = chip.getAttribute('data-filter');
+      document.querySelectorAll('.chip').forEach(function (c) {
+        c.setAttribute('aria-selected', String(c === chip));
+      });
+      render();
+    });
+  });
+
+  var toastTimer = null;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 1600);
+  }
+
+  /* ---------- 摘要导出 ---------- */
+  function buildSummary() {
+    var groups = { pending: [], confirmed: [], done: [], ignored: [] };
+    TODOS.forEach(function (t) { groups[state[t.id]].push(t); });
+
+    var lines = ['# ' + CONFIG.title + '（' + CONFIG.date + '）', ''];
+
+    function section(title, key, mark) {
+      if (!groups[key].length) return;
+      lines.push('## ' + title + '（' + groups[key].length + '）');
+      groups[key].forEach(function (t) {
+        lines.push('- ' + mark + ' ' + t.priority + ' · ' + (t.owner === 'ours' ? '我方' : '外部') + ' · ' + t.title);
+        (comments[t.id] || []).forEach(function (c) {
+          lines.push('  - ' + c.author + '（' + c.at + '）：' + c.text.replace(/\n/g, ' '));
+        });
+      });
+      lines.push('');
+    }
+
+    section('未确认', 'pending', '[ ]');
+    section('已确认', 'confirmed', '[~]');
+    section('已完成', 'done', '[x]');
+    section('已忽略', 'ignored', '[-]');
+
+    var totalComments = TODOS.reduce(function (n, t) { return n + (comments[t.id] || []).length; }, 0);
+    lines.push('---');
+    lines.push('总计 ' + TODOS.length + ' 项：未确认 ' + groups.pending.length +
+      ' / 已确认 ' + groups.confirmed.length + ' / 已关闭 ' + (groups.done.length + groups.ignored.length) +
+      ' · 评论 ' + totalComments + ' 条');
+    return lines.join('\n');
+  }
+
+  document.getElementById('exportBtn').addEventListener('click', function () {
+    var text = buildSummary();
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); toast('摘要已复制'); }
+      catch (e) { toast('复制失败，请手动选择'); }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast('摘要已复制'); }, fallback);
+    } else {
+      fallback();
+    }
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', function () {
+    if (!window.confirm('确定重置全部勾选状态与评论吗？此操作不可撤销。')) return;
+    TODOS.forEach(function (t) {
+      state[t.id] = 'pending';
+      comments[t.id] = (t.comments || []).slice();
+      drafts[t.id] = '';
+    });
+    savedAt = '—';
+    try { localStorage.removeItem(CONFIG.storeKey); } catch (e) { /* noop */ }
+    closeDrawer();
+    render();
+    toast('已重置');
+  });
+
+  /* ---------- 启动 ---------- */
+  (function init() {
+    var loaded = load();
+    state = loaded.state;
+    comments = loaded.comments;
+    drafts = loaded.drafts || {};
+    render();
+  })();
+})();
+</script>
+</body>
+</html>
